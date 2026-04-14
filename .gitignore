@@ -35,6 +35,7 @@ override.tf.json
 terraform.rc
 
 credentials
+aws.env
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

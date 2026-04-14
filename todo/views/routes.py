@@ -1,7 +1,8 @@
-from flask import Blueprint, jsonify, request 
+from flask import Blueprint, jsonify, request
 from todo.models import db 
 from todo.models.todo import Todo 
 from datetime import datetime, timedelta
+from todo.tasks import ical
 
 api = Blueprint('api', __name__, url_prefix='/api/v1') 
 
@@ -93,4 +94,39 @@ def delete_todo(todo_id):
     db.session.delete(todo) 
     db.session.commit() 
     return jsonify(todo.to_dict()), 200
- 
+
+
+@api.route('/todos/ical', methods=['POST'])
+def create_ical():
+    """Create an asynchronous iCal generation task."""
+    todos = Todo.query.order_by(Todo.created_at.desc()).all()
+    todo_input = [todo.to_dict() for todo in todos]
+
+    task = ical.create_ical.delay(todo_input)
+    result = {
+        'task_id': task.id,
+        'task_url': f'{request.host_url}api/v1/todos/ical/{task.id}/status',
+    }
+    return jsonify(result), 202
+
+
+@api.route('/todos/ical/<task_id>/status', methods=['GET'])
+def get_task(task_id):
+    """Return the status of a submitted iCal generation task."""
+    task_result = ical.celery.AsyncResult(task_id)
+    result = {
+        "task_id": task_id,
+        "task_status": task_result.status,
+        "result_url": f'{request.host_url}api/v1/todos/ical/{task_id}/result',
+    }
+    return jsonify(result), 200
+
+
+@api.route('/todos/ical/<task_id>/result', methods=['GET'])
+def get_calendar(task_id):
+    """Return the generated iCal payload once the task completes."""
+    task_result = ical.celery.AsyncResult(task_id)
+    if task_result.status == 'SUCCESS':
+        return task_result.result, 200, {'Content-Type': 'text/calendar'}
+
+    return jsonify({'error': 'Task not finished'}), 404

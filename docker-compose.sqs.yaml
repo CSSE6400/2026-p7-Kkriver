@@ -1,0 +1,20 @@
+services:
+  app:
+    env_file:
+      - path: ./aws.env
+        required: false
+    environment:
+      CELERY_BROKER_URL: sqs://
+      CELERY_RESULT_BACKEND: db+postgresql://administrator:verySecretPassword@database:5432/todo
+    depends_on:
+      - database
+
+  worker:
+    env_file:
+      - path: ./aws.env
+        required: false
+    environment:
+      CELERY_BROKER_URL: sqs://
+      CELERY_RESULT_BACKEND: db+postgresql://administrator:verySecretPassword@database:5432/todo
+    depends_on:
+      - database
